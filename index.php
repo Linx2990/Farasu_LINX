@@ -1,150 +1,652 @@
 <?php
-session_start();
+ini_set("display_errors", 1);
+ini_set("display_startup_errors", 1);
+error_reporting(E_ALL);
 
-if (
-    !isset($_SESSION["user_id"]) &&
-    basename($_SERVER["PHP_SELF"]) != "login.php" &&
-    basename($_SERVER["PHP_SELF"]) != "register.php"
-) {
-    header("Location: login.php");
+header("Access-Control-Allow-Origin: *");
+header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization");
+header("Content-Type: application/json");
+
+if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
+    http_response_code(200);
     exit();
 }
-?>
-<!DOCTYPE html>
-<html lang="fa" dir="rtl">
-   <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>ارائه دهنده فایل هوشمند</title>
-      <link rel="stylesheet" href="assets/css/style.css">
-      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-      <link href="https://fonts.googleapis.com/css2?family=Beiruti:wght@200..900&display=swap" rel="stylesheet">
-   </head>
-   <body>
-      <div class="container">
-         <header class="main-header">
-            <div class="logo">
-               <h1>ارائه دهنده فایل هوشمند</h1>
-            </div>
-            <?php if(isset($_SESSION['user_id'])): ?>
-            <div class="user-menu">
-               <span class="username"><?php echo htmlspecialchars($_SESSION['username']); ?></span>
-               <a href="logout.php" class="btn btn-outline"><i class="fas fa-sign-out-alt"></i>خروج </a>
-            </div>
-            <?php endif; ?>
-         </header>
-         <main class="dashboard">
-            <div class="sidebar">
-               <div class="sidebar-header">
-                  <h2>فایل‌های من</h2>
-                  <button id="newFileBtn" class="btn btn-primary"><i class="fas fa-plus"></i> فایل جدید</button>
-               </div>
-               <div class="search-box">
-                  <input type="text" id="fileSearch" placeholder="جستجوی فایل...">
-                  <i class="fas fa-search"></i>
-               </div>
-               <div class="file-list" id="fileList">
-                  <div class="loading">در حال بارگذاری...</div>
-               </div>
-            </div>
-            <div class="content-area">
-               <div class="editor-header">
-                  <h2 id="currentFileName">ویرایشگر فایل</h2>
-                  <div class="editor-actions">
-                     <button id="saveFileBtn" class="btn btn-success" disabled><i class="fas fa-save"></i>ذخیره </button>
-                     <button id="deleteFileBtn" class="btn btn-danger" disabled><i class="fas fa-trash"></i>حذف </button>
-                  </div>
-               </div>
-               <div class="editor-container">
-                  <div id="editorPlaceholder" class="editor-placeholder">
-                     <i class="fas fa-file-alt"></i>
-                     <p>فایلی انتخاب نشده است</p>
-                     <p class="hint">برای ویرایش، یک فایل را از لیست سمت راست انتخاب کنید یا یک فایل جدید ایجاد نمایید</p>
-                  </div>
-                  <textarea id="fileEditor" class="file-editor"></textarea>
-               </div>
-            </div>
-         </main>
-      </div>
-      <div id="newFileModal" class="modal">
-         <div class="modal-content">
-            <div class="modal-header">
-               <h2>ایجاد فایل جدید</h2>
-               <span class="close">&times;</span>
-            </div>
-            <div class="modal-body">
-               <div class="form-group">
-                  <label for="newFileName">نام فایل:</label>
-                  <input type="text" id="newFileName" placeholder="مثال: test">
-               </div>
-               <div class="form-group">
-                  <label for="newFileType">نوع فایل:</label>
-                  <select id="newFileType">
-                     <option value="html">HTML</option>
-                     <option value="css">CSS</option>
-                     <option value="js">JavaScript</option>
-                     <option value="json">JSON</option>
-                     <option value="php">PHP</option>
-                  </select>
-               </div>
-               <div class="form-group">
-                  <label for="newFileContent">محتوای فایل:</label>
-                  <textarea id="newFileContent" rows="10"></textarea>
-               </div>
-               <div class="form-group">
-                  <label class="checkbox-label">
-                  <input type="checkbox" id="isProtected"> محافظت با رمز عبور
-                  </label>
-               </div>
-               <div class="form-group" id="passwordGroup" style="display: none;">
-                  <label for="filePassword">رمز عبور فایل:</label>
-                  <input type="password" id="filePassword">
-               </div>
-            </div>
-            <div class="modal-footer">
-               <button id="createFileBtn" class="btn btn-primary">ایجاد فایل</button>
-            </div>
-         </div>
-      </div>
-      <div id="passwordModal" class="modal">
-         <div class="modal-content">
-            <div class="modal-header">
-               <h2>فایل محافظت شده</h2>
-               <span class="close">&times;</span>
-            </div>
-            <div class="modal-body">
-               <p>این فایل با رمز عبور محافظت شده است. لطفاً رمز عبور را وارد کنید.</p>
-               <div class="form-group">
-                  <label for="enterFilePassword">رمز عبور:</label>
-                  <input type="password" id="enterFilePassword">
-               </div>
-            </div>
-            <div class="modal-footer">
-               <button id="submitPasswordBtn" class="btn btn-primary">تایید</button>
-            </div>
-         </div>
-      </div>
-      <div id="deleteModal" class="modal">
-         <div class="modal-content">
-            <div class="modal-header">
-               <h2>حذف فایل</h2>
-               <span class="close">&times;</span>
-            </div>
-            <div class="modal-body">
-               <p>آیا از حذف این فایل اطمینان دارید؟</p>
-               <p class="warning">این عملیات غیرقابل بازگشت است!</p>
-               <div class="form-group" id="deletePasswordGroup" style="display: none;">
-                  <label for="deleteFilePassword">رمز عبور فایل:</label>
-                  <input type="password" id="deleteFilePassword">
-               </div>
-            </div>
-            <div class="modal-footer">
-               <button id="confirmDeleteBtn" class="btn btn-danger">حذف</button>
-               <button class="btn btn-outline close-modal">انصراف</button>
-            </div>
-         </div>
-      </div>
-      <script src="assets/js/script.js"></script>
-   </body>
-</html>
-<!-- Developer: DevZeus (Mahyar Asghari) -->
+
+require_once "../includes/config.php";
+require_once "../includes/functions.php";
+
+$request_uri = $_SERVER["REQUEST_URI"];
+$path = parse_url($request_uri, PHP_URL_PATH);
+$path = preg_replace("/^\/api\//", "", $path);
+$segments = explode("/", $path);
+$resource = $segments[0] ?? "";
+
+$method = $_SERVER["REQUEST_METHOD"];
+
+$data = json_decode(file_get_contents("php://input"), true);
+if (json_last_error() !== JSON_ERROR_NONE) {
+    $data = [];
+}
+
+function authenticate()
+{
+    $headers = getallheaders();
+    $auth_header = $headers["Authorization"] ?? "";
+
+    if (
+        empty($auth_header) ||
+        !preg_match('/Bearer\s+(.*)$/i', $auth_header, $matches)
+    ) {
+        http_response_code(401);
+        echo json_encode([
+            "success" => false,
+            "error" => "Authentication required",
+        ]);
+        exit();
+    }
+
+    $token = $matches[1];
+
+    $conn = getDbConnection();
+    $stmt = $conn->prepare(
+        "SELECT user_id FROM api_tokens WHERE token = ? AND expires_at > NOW()"
+    );
+    $stmt->bind_param("s", $token);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    if ($result->num_rows === 0) {
+        http_response_code(401);
+        echo json_encode([
+            "success" => false,
+            "error" => "Invalid or expired token",
+        ]);
+        exit();
+    }
+
+    $row = $result->fetch_assoc();
+    $stmt->close();
+    $conn->close();
+
+    return $row["user_id"];
+}
+
+switch ($resource) {
+    case "auth":
+        handleAuth($method, $data);
+        break;
+    case "files":
+        handleFiles($method, $data, $segments);
+        break;
+    default:
+        http_response_code(404);
+        echo json_encode([
+            "success" => false,
+            "error" => "Resource not found",
+        ]);
+}
+
+function handleAuth($method, $data)
+{
+    if ($method !== "POST") {
+        http_response_code(405);
+        echo json_encode([
+            "success" => false,
+            "error" => "Method not allowed",
+        ]);
+        return;
+    }
+
+    $action = $data["action"] ?? "";
+
+    switch ($action) {
+        case "login":
+            apiLogin($data);
+            break;
+        case "register":
+            apiRegister($data);
+            break;
+        default:
+            http_response_code(400);
+            echo json_encode([
+                "success" => false,
+                "error" => "Invalid action",
+            ]);
+    }
+}
+
+function apiLogin($data)
+{
+    $username = $data["username"] ?? "";
+    $password = $data["password"] ?? "";
+
+    if (empty($username) || empty($password)) {
+        http_response_code(400);
+        echo json_encode([
+            "success" => false,
+            "error" => "Username and password are required",
+        ]);
+        return;
+    }
+
+    $conn = getDbConnection();
+    $stmt = $conn->prepare(
+        "SELECT id, username, email, password FROM users WHERE username = ?"
+    );
+    $stmt->bind_param("s", $username);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    if ($result->num_rows === 0) {
+        http_response_code(401);
+        echo json_encode([
+            "success" => false,
+            "error" => "Invalid credentials",
+        ]);
+        $stmt->close();
+        $conn->close();
+        return;
+    }
+
+    $user = $result->fetch_assoc();
+
+    if (!password_verify($password, $user["password"])) {
+        http_response_code(401);
+        echo json_encode([
+            "success" => false,
+            "error" => "Invalid credentials",
+        ]);
+        $stmt->close();
+        $conn->close();
+        return;
+    }
+
+    $token = bin2hex(random_bytes(32));
+    $expires_at = date("Y-m-d H:i:s", strtotime("+30 days"));
+
+    $stmt = $conn->prepare(
+        "INSERT INTO api_tokens (user_id, token, expires_at) VALUES (?, ?, ?)"
+    );
+    $stmt->bind_param("iss", $user["id"], $token, $expires_at);
+    $stmt->execute();
+
+    $stmt->close();
+    $conn->close();
+
+    echo json_encode([
+        "success" => true,
+        "message" => "Login successful",
+        "user" => [
+            "id" => $user["id"],
+            "username" => $user["username"],
+            "email" => $user["email"],
+        ],
+        "token" => $token,
+        "expires_at" => $expires_at,
+    ]);
+}
+
+function apiRegister($data)
+{
+    $username = $data["username"] ?? "";
+    $email = $data["email"] ?? "";
+    $password = $data["password"] ?? "";
+
+    if (empty($username) || empty($email) || empty($password)) {
+        http_response_code(400);
+        echo json_encode([
+            "success" => false,
+            "error" => "Username, email, and password are required",
+        ]);
+        return;
+    }
+
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        http_response_code(400);
+        echo json_encode([
+            "success" => false,
+            "error" => "Invalid email format",
+        ]);
+        return;
+    }
+
+    $conn = getDbConnection();
+
+    $stmt = $conn->prepare(
+        "SELECT id FROM users WHERE username = ? OR email = ?"
+    );
+    $stmt->bind_param("ss", $username, $email);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    if ($result->num_rows > 0) {
+        http_response_code(400);
+        echo json_encode([
+            "success" => false,
+            "error" => "Username or email already exists",
+        ]);
+        $stmt->close();
+        $conn->close();
+        return;
+    }
+
+    $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+
+    $stmt = $conn->prepare(
+        "INSERT INTO users (username, email, password, created_at) VALUES (?, ?, ?, NOW())"
+    );
+    $stmt->bind_param("sss", $username, $email, $hashed_password);
+    $stmt->execute();
+
+    $user_id = $conn->insert_id;
+
+    $stmt->close();
+    $conn->close();
+
+    echo json_encode([
+        "success" => true,
+        "message" => "Registration successful",
+        "user" => [
+            "id" => $user_id,
+            "username" => $username,
+            "email" => $email,
+        ],
+    ]);
+}
+
+function handleFiles($method, $data, $segments)
+{
+    $user_id = authenticate();
+
+    switch ($method) {
+        case "GET":
+            if (isset($segments[1])) {
+                getFile($user_id, $segments[1]);
+            } else {
+                getFiles($user_id);
+            }
+            break;
+        case "POST":
+            createFile($user_id, $data);
+            break;
+        case "PUT":
+            if (!isset($segments[1])) {
+                http_response_code(400);
+                echo json_encode([
+                    "success" => false,
+                    "error" => "File ID is required",
+                ]);
+                return;
+            }
+            updateFile($user_id, $segments[1], $data);
+            break;
+        case "DELETE":
+            if (!isset($segments[1])) {
+                http_response_code(400);
+                echo json_encode([
+                    "success" => false,
+                    "error" => "File ID is required",
+                ]);
+                return;
+            }
+            deleteFile($user_id, $segments[1]);
+            break;
+        default:
+            http_response_code(405);
+            echo json_encode([
+                "success" => false,
+                "error" => "Method not allowed",
+            ]);
+    }
+}
+
+function getFiles($user_id)
+{
+    $conn = getDbConnection();
+    $stmt = $conn->prepare(
+        "SELECT id, name, type, is_protected, created_at, updated_at FROM files WHERE user_id = ?"
+    );
+    $stmt->bind_param("i", $user_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    $files = [];
+    while ($row = $result->fetch_assoc()) {
+        $files[] = [
+            "id" => $row["id"],
+            "name" => $row["name"],
+            "type" => $row["type"],
+            "is_protected" => (bool) $row["is_protected"],
+            "created_at" => $row["created_at"],
+            "updated_at" => $row["updated_at"],
+        ];
+    }
+
+    $stmt->close();
+    $conn->close();
+
+    echo json_encode([
+        "success" => true,
+        "files" => $files,
+    ]);
+}
+
+function getFile($user_id, $file_id)
+{
+    $file_password = $_GET["password"] ?? null;
+
+    $conn = getDbConnection();
+    $stmt = $conn->prepare(
+        "SELECT id, name, type, content, is_protected, password, created_at, updated_at FROM files WHERE id = ? AND user_id = ?"
+    );
+    $stmt->bind_param("ii", $file_id, $user_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    if ($result->num_rows === 0) {
+        http_response_code(404);
+        echo json_encode([
+            "success" => false,
+            "error" => "File not found",
+        ]);
+        $stmt->close();
+        $conn->close();
+        return;
+    }
+
+    $file = $result->fetch_assoc();
+
+    if ($file["is_protected"]) {
+        if (empty($file_password)) {
+            http_response_code(401);
+            echo json_encode([
+                "success" => false,
+                "error" => "File password required",
+                "file" => [
+                    "id" => $file["id"],
+                    "name" => $file["name"],
+                    "type" => $file["type"],
+                    "is_protected" => (bool) $file["is_protected"],
+                    "created_at" => $file["created_at"],
+                    "updated_at" => $file["updated_at"],
+                ],
+            ]);
+            $stmt->close();
+            $conn->close();
+            return;
+        }
+
+        if (!password_verify($file_password, $file["password"])) {
+            http_response_code(401);
+            echo json_encode([
+                "success" => false,
+                "error" => "Invalid file password",
+            ]);
+            $stmt->close();
+            $conn->close();
+            return;
+        }
+    }
+
+    $stmt->close();
+    $conn->close();
+
+    echo json_encode([
+        "success" => true,
+        "file" => [
+            "id" => $file["id"],
+            "name" => $file["name"],
+            "type" => $file["type"],
+            "content" => $file["content"],
+            "is_protected" => (bool) $file["is_protected"],
+            "created_at" => $file["created_at"],
+            "updated_at" => $file["updated_at"],
+        ],
+    ]);
+}
+
+function createFile($user_id, $data)
+{
+    $name = $data["name"] ?? "";
+    $type = $data["type"] ?? "";
+    $content = $data["content"] ?? "";
+    $is_protected = isset($data["is_protected"])
+        ? (bool) $data["is_protected"]
+        : false;
+    $password = $data["password"] ?? null;
+
+    if (empty($name) || empty($type)) {
+        http_response_code(400);
+        echo json_encode([
+            "success" => false,
+            "error" => "File name and type are required",
+        ]);
+        return;
+    }
+
+    $allowed_types = ["html", "css", "js", "json", "php"];
+    if (!in_array($type, $allowed_types)) {
+        http_response_code(400);
+        echo json_encode([
+            "success" => false,
+            "error" =>
+                "Invalid file type. Allowed types: html, css, js, json, php",
+        ]);
+        return;
+    }
+
+    $name = preg_replace("/[^\w\-\.]/", "", $name);
+
+    $conn = getDbConnection();
+
+    $stmt = $conn->prepare(
+        "SELECT id FROM files WHERE name = ? AND type = ? AND user_id = ?"
+    );
+    $stmt->bind_param("ssi", $name, $type, $user_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    if ($result->num_rows > 0) {
+        http_response_code(400);
+        echo json_encode([
+            "success" => false,
+            "error" => "File already exists",
+        ]);
+        $stmt->close();
+        $conn->close();
+        return;
+    }
+
+    $hashed_password = null;
+    if ($is_protected && !empty($password)) {
+        $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+    }
+
+    $stmt = $conn->prepare(
+        "INSERT INTO files (user_id, name, type, content, is_protected, password, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())"
+    );
+    $stmt->bind_param(
+        "isssss",
+        $user_id,
+        $name,
+        $type,
+        $content,
+        $is_protected,
+        $hashed_password
+    );
+    $stmt->execute();
+
+    $file_id = $conn->insert_id;
+
+    $user_dir = "../files/$user_id";
+    if (!file_exists($user_dir)) {
+        mkdir($user_dir, 0755, true);
+    }
+
+    $file_path = "$user_dir/$name.$type";
+    file_put_contents($file_path, $content);
+
+    $stmt->close();
+    $conn->close();
+
+    echo json_encode([
+        "success" => true,
+        "message" => "File created successfully",
+        "file" => [
+            "id" => $file_id,
+            "name" => $name,
+            "type" => $type,
+            "is_protected" => $is_protected,
+            "created_at" => date("Y-m-d H:i:s"),
+            "updated_at" => date("Y-m-d H:i:s"),
+        ],
+    ]);
+}
+
+function updateFile($user_id, $file_id, $data)
+{
+    $content = $data["content"] ?? "";
+    $file_password = $data["password"] ?? null;
+
+    $conn = getDbConnection();
+
+    $stmt = $conn->prepare(
+        "SELECT id, name, type, is_protected, password FROM files WHERE id = ? AND user_id = ?"
+    );
+    $stmt->bind_param("ii", $file_id, $user_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    if ($result->num_rows === 0) {
+        http_response_code(404);
+        echo json_encode([
+            "success" => false,
+            "error" => "File not found",
+        ]);
+        $stmt->close();
+        $conn->close();
+        return;
+    }
+
+    $file = $result->fetch_assoc();
+
+    if ($file["is_protected"]) {
+        if (empty($file_password)) {
+            http_response_code(401);
+            echo json_encode([
+                "success" => false,
+                "error" => "File password required",
+            ]);
+            $stmt->close();
+            $conn->close();
+            return;
+        }
+
+        if (!password_verify($file_password, $file["password"])) {
+            http_response_code(401);
+            echo json_encode([
+                "success" => false,
+                "error" => "Invalid file password",
+            ]);
+            $stmt->close();
+            $conn->close();
+            return;
+        }
+    }
+
+    $stmt = $conn->prepare(
+        "UPDATE files SET content = ?, updated_at = NOW() WHERE id = ?"
+    );
+    $stmt->bind_param("si", $content, $file_id);
+    $stmt->execute();
+
+    $user_dir = "../files/$user_id";
+    $file_path = "$user_dir/{$file["name"]}.{$file["type"]}";
+    file_put_contents($file_path, $content);
+
+    $stmt->close();
+    $conn->close();
+
+    echo json_encode([
+        "success" => true,
+        "message" => "File updated successfully",
+        "file" => [
+            "id" => $file["id"],
+            "name" => $file["name"],
+            "type" => $file["type"],
+            "is_protected" => (bool) $file["is_protected"],
+            "updated_at" => date("Y-m-d H:i:s"),
+        ],
+    ]);
+}
+
+function deleteFile($user_id, $file_id)
+{
+    $file_password = $_GET["password"] ?? null;
+
+    $conn = getDbConnection();
+
+    $stmt = $conn->prepare(
+        "SELECT id, name, type, is_protected, password FROM files WHERE id = ? AND user_id = ?"
+    );
+    $stmt->bind_param("ii", $file_id, $user_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    if ($result->num_rows === 0) {
+        http_response_code(404);
+        echo json_encode([
+            "success" => false,
+            "error" => "File not found",
+        ]);
+        $stmt->close();
+        $conn->close();
+        return;
+    }
+
+    $file = $result->fetch_assoc();
+
+    if ($file["is_protected"]) {
+        if (empty($file_password)) {
+            http_response_code(401);
+            echo json_encode([
+                "success" => false,
+                "error" => "File password required",
+            ]);
+            $stmt->close();
+            $conn->close();
+            return;
+        }
+
+        if (!password_verify($file_password, $file["password"])) {
+            http_response_code(401);
+            echo json_encode([
+                "success" => false,
+                "error" => "Invalid file password",
+            ]);
+            $stmt->close();
+            $conn->close();
+            return;
+        }
+    }
+
+    $stmt = $conn->prepare("DELETE FROM files WHERE id = ?");
+    $stmt->bind_param("i", $file_id);
+    $stmt->execute();
+
+    $user_dir = "../files/$user_id";
+    $file_path = "$user_dir/{$file["name"]}.{$file["type"]}";
+    if (file_exists($file_path)) {
+        unlink($file_path);
+    }
+
+    $stmt->close();
+    $conn->close();
+
+    echo json_encode([
+        "success" => true,
+        "message" => "File deleted successfully",
+    ]);
+}
+// Developer: DevZeus (Mahyar Asghari)
